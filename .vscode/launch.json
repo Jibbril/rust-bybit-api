@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug rust-bybit-api",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rust-bybit-api",
+                    "--package=rust-bybit-api"
+                ],
+                "filter": {
+                    "name": "rust-bybit-api",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
