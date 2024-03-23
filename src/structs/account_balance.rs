@@ -57,7 +57,7 @@ pub struct AccountInfo {
     #[serde(rename = "totalMaintenanceMargin")]
     total_maintenance_margin: String,
 
-    coin: Vec<CoinInfo>,
+    pub coin: Vec<CoinInfo>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -82,7 +82,7 @@ pub struct CoinInfo {
     total_position_mm: String,
 
     #[serde(rename = "usdValue")]
-    usd_value: String,
+    pub usd_value: String,
 
     #[serde(rename = "spotHedgingQty")]
     spot_hedging_qty: String,
@@ -100,7 +100,7 @@ pub struct CoinInfo {
     total_position_im: String,
 
     #[serde(rename = "walletBalance")]
-    wallet_balance: String,
+    pub wallet_balance: String,
 
     #[serde(rename = "cumRealisedPnl")]
     cum_realised_pnl: String,
@@ -110,5 +110,5 @@ pub struct CoinInfo {
     #[serde(rename = "marginCollateral")]
     margin_collateral: bool,
 
-    coin: String,
+    pub coin: String,
 }
