@@ -7,7 +7,7 @@ use hmac::{Hmac,Mac};
 use reqwest::{get, Client};
 use serde_json::{json,Map, to_string, Value};
 use sha2::Sha256;
-use structs::account_balance::AccountInfo;
+use structs::{account_balance::AccountInfo, tickers::TickersApiResponse};
 use crate::structs::{server_time::ServerTimeApiResponse, account_balance::AccountBalanceApiResponse, market_create::MarketCreateApiResponse};
 use std::{env, collections::HashMap};
 
@@ -25,6 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let account_info = get_account_info(server_time).await?;
     println!("Total Available Balance: {:#?}", account_info.total_available_balance);
+
+    let current_price = get_current_price("BTCUSDT").await?;
+    println!("Current Price: {:#?}", current_price);
 
     let buy = false;
 
@@ -135,17 +138,66 @@ async fn post_market_order(params: Map<String,Value>) -> Result<()> {
     Ok(())
 }
 
-async fn market_buy(amount: f64) -> Result<()> {
-    let rounded_amount = round(amount, 2);
+async fn get_current_price(symbol: &str) -> Result<f64> {
+    let client = Client::new();
+
+    let mut params: HashMap<String,String> = HashMap::new();
+    params.insert("category".to_string(), "spot".to_string());
+    params.insert("symbol".to_string(), symbol.to_string());
+
+    let base_url = build_url( "/v5/market/tickers");
+    let url = format!("{}?{}", base_url, params_to_query_str(&params));
+    let api_key = api_key()?;
+    let recv_window = 5000;
+    let server_time = get_server_time().await?;
+    let signature = generate_hmac_signature(
+        server_time,
+        &api_key,
+        recv_window,
+        params_to_query_str(&params)
+    )?;
+
+    let res = client.get(url)
+        .header("X-BAPI-SIGN", signature)
+        .header("X-BAPI-API-KEY", api_key)
+        .header("X-BAPI-SIGN-TYPE", "2")
+        .header("X-BAPI-TIMESTAMP", server_time)
+        .header("X-BAPI-RECV-WINDOW", recv_window)
+        .send()
+        .await?;
+
+    let response = match res.status() {
+        reqwest::StatusCode::OK => {
+            let resdata: TickersApiResponse = res.json().await?;
+            resdata
+        },
+        _ => panic!("Unable to fetch account balance")
+    };
+
+    let account_info = response
+        .result
+        .list
+        .first()
+        .cloned()
+        .expect("Tickers endpoint should return at least one account.");
+
+    let last_price: f64 = account_info.last_price.parse()?;
+
+    Ok(last_price)   
+}
+
+async fn market_buy(quantity: f64) -> Result<()> {
+    let symbol = "BTCUSDT";
+    let rounded_quantity = round(quantity, 2);
 
     let mut params = Map::new();
     params.insert("category".to_string(), json!("spot"));
-    params.insert("symbol".to_string(), json!("BTCUSDT"));
+    params.insert("symbol".to_string(), json!(symbol));
     params.insert("side".to_string(), json!("Buy"));
     params.insert("orderType".to_string(), json!("Market"));
-    params.insert("qty".to_string(), json!(rounded_amount.to_string()));
     params.insert("marketUnit".to_string(), json!("quoteCoin"));
-    
+    params.insert("qty".to_string(), json!(rounded_quantity.to_string()));
+
     println!("params: {:#?}",params);
 
     Ok(post_market_order(params).await?)
@@ -224,7 +276,6 @@ fn round(x: f64, n: i64) -> f64 {
     let scaling = 10f64.powi(n as i32);
     (x * scaling).round() / scaling
 }
-
 
 fn floor(x: f64, n: i64) -> f64 {
     let scaling = 10f64.powi(n as i32);
